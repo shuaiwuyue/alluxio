@@ -14,24 +14,43 @@ package alluxio.master.file;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.when;
 
+import alluxio.AlluxioURI;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
 import alluxio.master.file.DefaultFileSystemMaster.Metrics;
 import alluxio.master.file.meta.InodeTree;
+import alluxio.master.file.meta.NoopUfsAbsentPathCache;
+import alluxio.master.file.meta.UfsAbsentPathCache;
 import alluxio.metrics.MetricKey;
 import alluxio.metrics.MetricsSystem;
 import alluxio.resource.CloseableResource;
+import alluxio.underfs.UfsFileStatus;
 import alluxio.underfs.UfsManager;
+import alluxio.underfs.UfsStatus;
+import alluxio.underfs.UfsStatusCache;
 import alluxio.underfs.UnderFileSystem;
 
+import com.codahale.metrics.Counter;
+import com.google.common.collect.ImmutableList;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.mockito.Mockito;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 /**
  * Unit tests for {@link DefaultFileSystemMaster.Metrics}.
  */
 public class FileSystemMasterMetricsTest {
+
+  @Rule
+  public TemporaryFolder mTempDir = new TemporaryFolder();
   private UfsManager mUfsManager;
   private InodeTree mInodeTree;
 
@@ -73,13 +92,62 @@ public class FileSystemMasterMetricsTest {
     assertEquals(800L, getGauge(MetricKey.CLUSTER_ROOT_UFS_CAPACITY_FREE.getName()));
   }
 
+  @Test
+  public void testMetricsUfsStatusCache() throws Exception {
+    final Counter cacheSizeTotal = getCounter(MetricKey.MASTER_UFS_STATUS_CACHE_SIZE.getName());
+    final Counter cacheChildrenSizeTotal =
+        getCounter(MetricKey.MASTER_UFS_STATUS_CACHE_CHILDREN_SIZE.getName());
+
+    ExecutorService executorService = Executors.newSingleThreadExecutor();
+    UfsStatusCache ufsStatusCache =
+        new UfsStatusCache(executorService, new NoopUfsAbsentPathCache(),
+            UfsAbsentPathCache.ALWAYS);
+
+    AlluxioURI path = new AlluxioURI("/dir");
+    UfsStatus status = createUfsStatusWithName("dir");
+    ufsStatusCache.addStatus(path, status);
+    assertEquals(1, cacheSizeTotal.getCount());
+    //add once more
+    ufsStatusCache.addStatus(path, status);
+    assertEquals(1, cacheSizeTotal.getCount());
+
+    List<UfsStatus> statusList = ImmutableList.of("1", "2", "3")
+        .stream()
+        .map(FileSystemMasterMetricsTest::createUfsStatusWithName)
+        .collect(Collectors.toList());
+
+    ufsStatusCache.addChildren(path, statusList);
+    assertEquals(4, cacheSizeTotal.getCount());
+    assertEquals(3, cacheChildrenSizeTotal.getCount());
+
+    statusList = ImmutableList.of("1", "2", "3", "4")
+        .stream()
+        .map(FileSystemMasterMetricsTest::createUfsStatusWithName)
+        .collect(Collectors.toList());
+    ufsStatusCache.addChildren(path, statusList);
+    assertEquals(5, cacheSizeTotal.getCount());
+    assertEquals(4, cacheChildrenSizeTotal.getCount());
+
+    ufsStatusCache.remove(path);
+    assertEquals(0, cacheSizeTotal.getCount());
+    assertEquals(0, cacheChildrenSizeTotal.getCount());
+    //remove once more
+    ufsStatusCache.remove(path);
+    assertEquals(0, cacheSizeTotal.getCount());
+    assertEquals(0, cacheChildrenSizeTotal.getCount());
+  }
+
   private Object getGauge(String name) {
     return MetricsSystem.METRIC_REGISTRY.getGauges()
         .get(name).getValue();
   }
 
-  private Object getCounter(String name){
+  private Counter getCounter(String name){
     return MetricsSystem.METRIC_REGISTRY.getCounters()
-        .get(name).getCount();
+        .get(name);
+  }
+
+  private static UfsStatus createUfsStatusWithName(String name) {
+    return new UfsFileStatus(name, "hash", 0, 0L, "owner", "group", (short) 0, null, 0);
   }
 }
