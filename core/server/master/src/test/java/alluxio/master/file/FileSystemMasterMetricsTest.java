@@ -12,6 +12,7 @@
 package alluxio.master.file;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.when;
 
 import alluxio.AlluxioURI;
@@ -104,18 +105,22 @@ public class FileSystemMasterMetricsTest {
             UfsAbsentPathCache.ALWAYS);
 
     AlluxioURI path = new AlluxioURI("/dir");
-    UfsStatus status = createUfsStatusWithName("dir");
-    ufsStatusCache.addStatus(path, status);
+    UfsStatus stat = createUfsStatusWithName("dir");
+    UfsStatus statMismatch=createUfsStatusWithName("abc");
+
+    ufsStatusCache.addStatus(path, stat);
     assertEquals(1, cacheSizeTotal.getCount());
     //add once more
-    ufsStatusCache.addStatus(path, status);
+    ufsStatusCache.addStatus(path, stat);
+    assertEquals(1, cacheSizeTotal.getCount());
+    //path and status name mismatch
+    assertThrows(IllegalArgumentException.class,()->ufsStatusCache.addStatus(path,statMismatch));
     assertEquals(1, cacheSizeTotal.getCount());
 
     List<UfsStatus> statusList = ImmutableList.of("1", "2", "3")
         .stream()
         .map(FileSystemMasterMetricsTest::createUfsStatusWithName)
         .collect(Collectors.toList());
-
     ufsStatusCache.addChildren(path, statusList);
     assertEquals(4, cacheSizeTotal.getCount());
     assertEquals(3, cacheChildrenSizeTotal.getCount());
