@@ -85,7 +85,8 @@ public class FileSystemMasterMetricsTest {
     when(ufs.getSpace(ufsDataFolder, UnderFileSystem.SpaceType.SPACE_FREE)).thenReturn(800L);
     when(client.acquireUfsResource()).thenReturn(new CloseableResource<UnderFileSystem>(ufs) {
       @Override
-      public void closeResource() {}
+      public void closeResource() {
+      }
     });
     when(mUfsManager.getRoot()).thenReturn(client);
     assertEquals(1000L, getGauge(MetricKey.CLUSTER_ROOT_UFS_CAPACITY_TOTAL.getName()));
@@ -106,7 +107,7 @@ public class FileSystemMasterMetricsTest {
 
     AlluxioURI path = new AlluxioURI("/dir");
     UfsStatus stat = createUfsStatusWithName("dir");
-    UfsStatus statMismatch=createUfsStatusWithName("abc");
+    UfsStatus statMismatch = createUfsStatusWithName("abc");
 
     ufsStatusCache.addStatus(path, stat);
     assertEquals(1, cacheSizeTotal.getCount());
@@ -114,7 +115,8 @@ public class FileSystemMasterMetricsTest {
     ufsStatusCache.addStatus(path, stat);
     assertEquals(1, cacheSizeTotal.getCount());
     //path and status name mismatch
-    assertThrows(IllegalArgumentException.class,()->ufsStatusCache.addStatus(path,statMismatch));
+    assertThrows(IllegalArgumentException.class,
+        () -> ufsStatusCache.addStatus(path, statMismatch));
     assertEquals(1, cacheSizeTotal.getCount());
 
     List<UfsStatus> statusList = ImmutableList.of("1", "2", "3")
@@ -147,7 +149,7 @@ public class FileSystemMasterMetricsTest {
         .get(name).getValue();
   }
 
-  private Counter getCounter(String name){
+  private Counter getCounter(String name) {
     return MetricsSystem.METRIC_REGISTRY.getCounters()
         .get(name);
   }
