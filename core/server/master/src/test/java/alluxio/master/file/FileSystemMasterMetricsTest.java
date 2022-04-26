@@ -77,4 +77,9 @@ public class FileSystemMasterMetricsTest {
     return MetricsSystem.METRIC_REGISTRY.getGauges()
         .get(name).getValue();
   }
+
+  private Object getCounter(String name){
+    return MetricsSystem.METRIC_REGISTRY.getCounters()
+        .get(name).getCount();
+  }
 }
