@@ -278,18 +278,19 @@ public final class FileSystemMasterSyncMetadataTest {
 
   @Test
   public void testFileSystemMetricInodeSyncStream() throws Exception {
-    Instant instant = Instant.now();
+    Instant instantStart = Instant.now();
     // Prepare files
     AlluxioURI path = new AlluxioURI("/a");
-    mFileSystemMaster.createDirectory(new AlluxioURI("/a/"), CreateDirectoryContext.defaults());
-    mFileSystemMaster.listStatus(new AlluxioURI("/a"),ListStatusContext.defaults());
-    assertEquals(3L,DefaultFileSystemMaster.Metrics.INODE_SYNC_STREAM_COUNT.getCount());
+    mFileSystemMaster.createDirectory(path, CreateDirectoryContext.defaults());
     // If the sync operation happens, the flag will be marked
     LockingScheme syncScheme = new LockingScheme(path, InodeTree.LockPattern.READ, false);
     RpcContext rpcContext = RpcContext.NOOP;
-    InodeSyncStream inodeSyncStream=new InodeSyncStream(path,mFileSystemMaster,rpcContext,DescendantType.ONE
-        , FileSystemOptions.listStatusDefaults(ConfigurationTestUtils.defaults()),false,false,false,false);
+    InodeSyncStream inodeSyncStream=new InodeSyncStream(syncScheme,(DefaultFileSystemMaster)mFileSystemMaster,RpcContext.NOOP,DescendantType.ONE
+        , FileSystemMasterCommonPOptions.getDefaultInstance(),false,true,false,false);
     inodeSyncStream.sync();
+    assertEquals(2L,DefaultFileSystemMaster.Metrics.INODE_SYNC_STREAM_COUNT.getCount());
+    assertTrue(0<DefaultFileSystemMaster.Metrics.INODE_SYNC_STREAM_TIME_MS.getCount());
+    assertTrue(Duration.between(instantStart,Instant.now()).toMillis()<DefaultFileSystemMaster.Metrics.INODE_SYNC_STREAM_TIME_MS.getCount());
   }
 
   private static class SyncAwareFileSystemMaster extends DefaultFileSystemMaster {
