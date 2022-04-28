@@ -150,6 +150,8 @@ public class GrpcMessagingTransportTest {
     try {
       sendRequest(clientConnection, new DummyRequest("dummy")).get();
     } catch (ExecutionException e) {
+      System.out.println(e.getMessage());
+      e.printStackTrace();
       Assert.assertTrue(e.getCause() instanceof IllegalStateException);
       failed = true;
     }

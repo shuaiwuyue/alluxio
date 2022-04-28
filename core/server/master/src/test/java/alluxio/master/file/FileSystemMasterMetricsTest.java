@@ -85,6 +85,7 @@ public class FileSystemMasterMetricsTest {
   private UfsStatusCache mCache;
 
 
+
   @Before
   public void before() throws Exception {
     MetricsSystem.resetCountersAndGauges();
@@ -179,13 +180,6 @@ public class FileSystemMasterMetricsTest {
     assertEquals(0, cacheSizeTotal.getCount());
     assertEquals(0, cacheChildrenSizeTotal.getCount());
   }
-
-  @Test
-  public void testMetricsInodeSyncStreamCount() throws Exception{
-    InodeSyncStream inodeSyncStream =new InodeSyncStream();
-  }
-
-
 
   private Gauge getGauge(String name) {
     return MetricsSystem.METRIC_REGISTRY.getGauges()

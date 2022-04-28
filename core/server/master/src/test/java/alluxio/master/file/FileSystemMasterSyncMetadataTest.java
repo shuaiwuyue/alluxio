@@ -14,11 +14,15 @@ package alluxio.master.file;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNotNull;
 
 import alluxio.AlluxioURI;
+import alluxio.ConfigurationTestUtils;
+import alluxio.conf.AlluxioConfiguration;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
 import alluxio.exception.AccessControlException;
@@ -44,7 +48,9 @@ import alluxio.master.file.contexts.GetStatusContext;
 import alluxio.master.file.contexts.ListStatusContext;
 import alluxio.master.file.contexts.MountContext;
 import alluxio.master.file.meta.Inode;
+import alluxio.master.file.meta.InodeTree;
 import alluxio.master.file.meta.LockedInodePath;
+import alluxio.master.file.meta.LockingScheme;
 import alluxio.master.journal.JournalSystem;
 import alluxio.master.journal.JournalTestUtils;
 import alluxio.master.journal.JournalType;
@@ -56,6 +62,7 @@ import alluxio.underfs.UfsDirectoryStatus;
 import alluxio.underfs.UfsFileStatus;
 import alluxio.underfs.UfsStatus;
 import alluxio.underfs.UnderFileSystem;
+import alluxio.util.FileSystemOptions;
 import alluxio.util.IdUtils;
 import alluxio.util.ModeUtils;
 import alluxio.util.ThreadFactoryUtils;
@@ -78,6 +85,8 @@ import org.powermock.modules.junit4.PowerMockRunner;
 import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -264,6 +273,38 @@ public final class FileSystemMasterSyncMetadataTest {
     assertNotEquals(IdUtils.INVALID_FILE_ID, mFileSystemMaster.getFileId(new AlluxioURI("/b/")));
     // Sync has not happened
     assertFalse(delegateMaster.mSynced.get());
+  }
+
+  @Test
+  public void testFileSystemMetricInodeSyncStream() throws Exception {
+    Instant instant = Instant.now();
+    // Prepare files
+    mFileSystemMaster.createDirectory(new AlluxioURI("/a/"), CreateDirectoryContext.defaults());
+    mFileSystemMaster.createDirectory(new AlluxioURI("/a/a"), CreateDirectoryContext.defaults());
+    mFileSystemMaster.createDirectory(new AlluxioURI("/a/b"), CreateDirectoryContext.defaults());
+    mFileSystemMaster.createDirectory(new AlluxioURI("/a/c"), CreateDirectoryContext.defaults());
+    // If the sync operation happens, the flag will be marked
+    RpcContext rpcContext = RpcContext.NOOP;
+    FileSystemMasterAuditContext auditContext =null;
+    InodeSyncStream inodeSyncStream=new InodeSyncStream(rpcContext,DescendantType.ONE
+        , FileSystemOptions.listStatusDefaults(ConfigurationTestUtils.defaults())
+        ,null,null,null,);
+    LockingScheme syncScheme = new LockingScheme(path, InodeTree.LockPattern.READ, options, mUfsSyncPathCache, isGetFileInfo);
+    LockingScheme rootScheme, DefaultFileSystemMaster fsMaster,
+        RpcContext rpcContext, DescendantType descendantType, FileSystemMasterCommonPOptions options,
+    boolean isGetFileInfo, boolean forceSync, boolean loadOnly, boolean loadAlways)
+    inodeSyncStream.sync();
+
+
+    assertEquals(5L,DefaultFileSystemMaster.Metrics.INODE_SYNC_STREAM_COUNT.getCount());
+    assertTrue(DefaultFileSystemMaster.Metrics.INODE_SYNC_STREAM_TIME_MS.getCount()>0);
+    assertTrue(DefaultFileSystemMaster.Metrics.INODE_SYNC_STREAM_TIME_MS.getCount()
+        < Duration.between(Instant.now(),instant).toMillis());
+
+    mFileSystemMaster.delete(new AlluxioURI("/a/"),
+        DeleteContext.mergeFrom(DeletePOptions.newBuilder()
+            .setRecursive(true)));
+    assertEquals(4L,DefaultFileSystemMaster.Metrics.INODE_SYNC_STREAM_COUNT.getCount());
   }
 
   private static class SyncAwareFileSystemMaster extends DefaultFileSystemMaster {
