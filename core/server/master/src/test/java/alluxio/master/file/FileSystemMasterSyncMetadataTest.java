@@ -15,6 +15,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -279,32 +280,16 @@ public final class FileSystemMasterSyncMetadataTest {
   public void testFileSystemMetricInodeSyncStream() throws Exception {
     Instant instant = Instant.now();
     // Prepare files
+    AlluxioURI path = new AlluxioURI("/a");
     mFileSystemMaster.createDirectory(new AlluxioURI("/a/"), CreateDirectoryContext.defaults());
-    mFileSystemMaster.createDirectory(new AlluxioURI("/a/a"), CreateDirectoryContext.defaults());
-    mFileSystemMaster.createDirectory(new AlluxioURI("/a/b"), CreateDirectoryContext.defaults());
-    mFileSystemMaster.createDirectory(new AlluxioURI("/a/c"), CreateDirectoryContext.defaults());
+    mFileSystemMaster.listStatus(new AlluxioURI("/a"),ListStatusContext.defaults());
+    assertEquals(3L,DefaultFileSystemMaster.Metrics.INODE_SYNC_STREAM_COUNT.getCount());
     // If the sync operation happens, the flag will be marked
+    LockingScheme syncScheme = new LockingScheme(path, InodeTree.LockPattern.READ, false);
     RpcContext rpcContext = RpcContext.NOOP;
-    FileSystemMasterAuditContext auditContext =null;
-    InodeSyncStream inodeSyncStream=new InodeSyncStream(rpcContext,DescendantType.ONE
-        , FileSystemOptions.listStatusDefaults(ConfigurationTestUtils.defaults())
-        ,null,null,null,);
-    LockingScheme syncScheme = new LockingScheme(path, InodeTree.LockPattern.READ, options, mUfsSyncPathCache, isGetFileInfo);
-    LockingScheme rootScheme, DefaultFileSystemMaster fsMaster,
-        RpcContext rpcContext, DescendantType descendantType, FileSystemMasterCommonPOptions options,
-    boolean isGetFileInfo, boolean forceSync, boolean loadOnly, boolean loadAlways)
+    InodeSyncStream inodeSyncStream=new InodeSyncStream(path,mFileSystemMaster,rpcContext,DescendantType.ONE
+        , FileSystemOptions.listStatusDefaults(ConfigurationTestUtils.defaults()),false,false,false,false);
     inodeSyncStream.sync();
-
-
-    assertEquals(5L,DefaultFileSystemMaster.Metrics.INODE_SYNC_STREAM_COUNT.getCount());
-    assertTrue(DefaultFileSystemMaster.Metrics.INODE_SYNC_STREAM_TIME_MS.getCount()>0);
-    assertTrue(DefaultFileSystemMaster.Metrics.INODE_SYNC_STREAM_TIME_MS.getCount()
-        < Duration.between(Instant.now(),instant).toMillis());
-
-    mFileSystemMaster.delete(new AlluxioURI("/a/"),
-        DeleteContext.mergeFrom(DeletePOptions.newBuilder()
-            .setRecursive(true)));
-    assertEquals(4L,DefaultFileSystemMaster.Metrics.INODE_SYNC_STREAM_COUNT.getCount());
   }
 
   private static class SyncAwareFileSystemMaster extends DefaultFileSystemMaster {
