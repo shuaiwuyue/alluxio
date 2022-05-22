@@ -40,6 +40,7 @@ import alluxio.util.LogUtils;
 import alluxio.util.WaitForOptions;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.net.HostAndPort;
 import org.apache.commons.io.FileUtils;
@@ -229,7 +230,7 @@ public class RaftJournalSystem extends AbstractJournalSystem {
   private final ClientId mRawClientId = ClientId.randomId();
   private RaftGroup mRaftGroup;
   private RaftPeerId mPeerId;
-  private Map<String, TransferLeaderMessage> mErrorMessages;
+  private final Map<String, TransferLeaderMessage> mErrorMessages;
 
   static long nextCallId() {
     return CALL_ID_COUNTER.getAndIncrement() & Long.MAX_VALUE;
@@ -270,8 +271,7 @@ public class RaftJournalSystem extends AbstractJournalSystem {
    * @return the created raft journal system
    */
   public static RaftJournalSystem create(RaftJournalConfiguration conf) {
-    RaftJournalSystem system = new RaftJournalSystem(conf);
-    return system;
+    return new RaftJournalSystem(conf);
   }
 
   private RaftJournalConfiguration processRaftConfiguration(RaftJournalConfiguration conf) {
@@ -429,15 +429,10 @@ public class RaftJournalSystem extends AbstractJournalSystem {
         .setParameters(parameters)
         .build();
     super.registerMetrics();
-    MetricsSystem.registerGaugeIfAbsent(
-        MetricKey.CLUSTER_LEADER_INDEX.getName(),
-        () -> getLeaderIndex());
-    MetricsSystem.registerGaugeIfAbsent(
-        MetricKey.MASTER_ROLE_ID.getName(),
-        () -> getRoleId());
-    MetricsSystem.registerGaugeIfAbsent(
-        MetricKey.CLUSTER_LEADER_ID.getName(),
-        () -> getLeaderId());
+    MetricsSystem.registerGaugeIfAbsent(MetricKey.CLUSTER_LEADER_INDEX.getName(),
+        this::getLeaderIndex);
+    MetricsSystem.registerGaugeIfAbsent(MetricKey.MASTER_ROLE_ID.getName(), this::getRoleId);
+    MetricsSystem.registerGaugeIfAbsent(MetricKey.CLUSTER_LEADER_ID.getName(), this::getLeaderId);
   }
 
   /**
@@ -648,8 +643,6 @@ public class RaftJournalSystem extends AbstractJournalSystem {
     return services;
   }
 
-  private static final long JOURNAL_STAT_LOG_MAX_INTERVAL_MS = 30000L;
-
   /**
    * Attempts to catch up. If the master loses leadership during this method, it will return early.
    *
@@ -754,7 +747,7 @@ public class RaftJournalSystem extends AbstractJournalSystem {
   }
 
   @Override
-  public synchronized void startInternal() throws InterruptedException, IOException {
+  public synchronized void startInternal() throws IOException {
     LOG.info("Initializing Raft Journal System");
     InetSocketAddress localAddress = mConf.getLocalAddress();
     mPeerId = RaftJournalUtils.getPeerId(localAddress);
@@ -818,7 +811,7 @@ public class RaftJournalSystem extends AbstractJournalSystem {
   }
 
   @Override
-  public synchronized void stopInternal() throws InterruptedException, IOException {
+  public synchronized void stopInternal() throws IOException {
     LOG.info("Shutting down raft journal");
     if (mRaftJournalWriter != null) {
       mRaftJournalWriter.close();
@@ -929,7 +922,7 @@ public class RaftJournalSystem extends AbstractJournalSystem {
    * For server to be removed, it should be in unavailable state in quorum.
    *
    * @param serverNetAddress address of the server to remove from the quorum
-   * @throws IOException
+   * @throws IOException raft exception
    */
   public synchronized void removeQuorumServer(NetAddress serverNetAddress) throws IOException {
     InetSocketAddress serverAddress = InetSocketAddress
@@ -949,7 +942,7 @@ public class RaftJournalSystem extends AbstractJournalSystem {
   /**
    * Resets RaftPeer priorities.
    *
-   * @throws IOException
+   * @throws IOException raft exception
    */
   public synchronized void resetPriorities() throws IOException {
     List<RaftPeer> resetPeers = new ArrayList<>();
@@ -1051,7 +1044,7 @@ public class RaftJournalSystem extends AbstractJournalSystem {
 
   /**
    * @param reply from the ratis operation
-   * @throws IOException
+   * @throws IOException raft exception
    */
   private void processReply(RaftClientReply reply, String msgToUser) throws IOException {
     if (!reply.isSuccess()) {
@@ -1130,6 +1123,17 @@ public class RaftJournalSystem extends AbstractJournalSystem {
         throw new AccessDeniedException(journalPath.getPath());
       }
     }
+  }
+
+  @Override
+  public String toString() {
+    return MoreObjects.toStringHelper(this)
+        .add("JournalPath", mConf.getPath())
+        .add("Address", mConf.getLocalAddress())
+        .add("State", mPrimarySelector.getState())
+        .add("Cluster", mConf.getClusterAddresses())
+        .add("RaftGroup", mRaftGroup)
+        .toString();
   }
 
   /**

@@ -55,7 +55,7 @@ public final class UnderFileSystemBlockReaderTest {
   private static final long BLOCK_ID = 2;
 
   private UnderFileSystemBlockReader mReader;
-  private BlockStore mAlluxioBlockStore;
+  private LocalBlockStore mAlluxioBlockStore;
   private UnderFileSystemBlockMeta mUnderFileSystemBlockMeta;
   private UfsManager.UfsClient mUfsClient;
   private UfsInputStreamCache mUfsInstreamCache;
@@ -114,8 +114,8 @@ public final class UnderFileSystemBlockReaderTest {
   private void checkTempBlock(long start, long length) throws Exception {
     Assert.assertTrue(mAlluxioBlockStore.hasTempBlockMeta(BLOCK_ID));
     mAlluxioBlockStore.commitBlock(SESSION_ID, BLOCK_ID, false);
-    long lockId = mAlluxioBlockStore.lockBlock(SESSION_ID, BLOCK_ID);
-    BlockReader reader = mAlluxioBlockStore.getBlockReader(SESSION_ID, BLOCK_ID, lockId);
+    long lockId = mAlluxioBlockStore.pinBlock(SESSION_ID, BLOCK_ID).getAsLong();
+    BlockReader reader = mAlluxioBlockStore.createBlockReader(SESSION_ID, BLOCK_ID, lockId);
     Assert.assertEquals(length, reader.getLength());
     ByteBuffer buffer = reader.read(0, length);
     assertTrue(BufferUtils.equalIncreasingByteBuffer((int) start, (int) length, buffer));
@@ -185,7 +185,7 @@ public final class UnderFileSystemBlockReaderTest {
 
   @Test
   public void readFullBlockRequestSpaceError() throws Exception {
-    BlockStore errorThrowingBlockStore = spy(mAlluxioBlockStore);
+    LocalBlockStore errorThrowingBlockStore = spy(mAlluxioBlockStore);
     doThrow(new WorkerOutOfSpaceException("Ignored"))
         .when(errorThrowingBlockStore)
         .requestSpace(anyLong(), anyLong(), anyLong());
@@ -200,7 +200,7 @@ public final class UnderFileSystemBlockReaderTest {
 
   @Test
   public void readFullBlockRequestCreateBlockError() throws Exception {
-    BlockStore errorThrowingBlockStore = spy(mAlluxioBlockStore);
+    LocalBlockStore errorThrowingBlockStore = spy(mAlluxioBlockStore);
     doThrow(new WorkerOutOfSpaceException("Ignored")).when(errorThrowingBlockStore)
         .createBlock(anyLong(), anyLong(), any(AllocateOptions.class));
     mReader = UnderFileSystemBlockReader.create(mUnderFileSystemBlockMeta, 0, false,

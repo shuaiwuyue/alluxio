@@ -57,13 +57,15 @@ import javax.annotation.concurrent.ThreadSafe;
 public class CacheRequestManager {
   private static final Logger LOG = LoggerFactory.getLogger(CacheRequestManager.class);
   private static final Logger SAMPLING_LOG = new SamplingLogger(LOG, 10L * Constants.MINUTE_MS);
+  private static final int NETWORK_HOST_RESOLUTION_TIMEOUT =
+      (int) ServerConfiguration.getMs(PropertyKey.NETWORK_HOST_RESOLUTION_TIMEOUT_MS);
 
   /** Executor service for execute the async cache tasks. */
   private final ExecutorService mCacheExecutor;
   /** The block worker. */
-  private final BlockWorker mBlockWorker;
-  private final ConcurrentHashMap<Long, CacheRequest> mActiveCacheRequests;
-  private final int mNetWorkHostResolutionTimeoutMs;
+  private final DefaultBlockWorker mBlockWorker;
+  private final ConcurrentHashMap<Long, CacheRequest> mActiveCacheRequests =
+      new ConcurrentHashMap<>();
   private final FileSystemContext mFsContext;
   /** Keeps track of the number of rejected cache requests. */
   private final AtomicLong mNumRejected = new AtomicLong(0);
@@ -73,14 +75,11 @@ public class CacheRequestManager {
    * @param blockWorker handler to the block worker
    * @param fsContext context
    */
-  public CacheRequestManager(ExecutorService service, BlockWorker blockWorker,
+  public CacheRequestManager(ExecutorService service, DefaultBlockWorker blockWorker,
       FileSystemContext fsContext) {
     mCacheExecutor = service;
     mBlockWorker = blockWorker;
     mFsContext = fsContext;
-    mActiveCacheRequests = new ConcurrentHashMap<>();
-    mNetWorkHostResolutionTimeoutMs =
-        (int) ServerConfiguration.getMs(PropertyKey.NETWORK_HOST_RESOLUTION_TIMEOUT_MS);
   }
 
   /**
@@ -226,11 +225,11 @@ public class CacheRequestManager {
   private boolean cacheBlock(CacheRequest request) throws IOException, AlluxioException {
     boolean result;
     boolean isSourceLocal = NetworkAddressUtils.isLocalAddress(request.getSourceHost(),
-        mNetWorkHostResolutionTimeoutMs);
+        NETWORK_HOST_RESOLUTION_TIMEOUT);
     long blockId = request.getBlockId();
     long blockLength = request.getLength();
     // Check if the block has already been cached on this worker
-    if (mBlockWorker.hasBlockMeta(blockId)) {
+    if (mBlockWorker.getLocalBlockStore().hasBlockMeta(blockId)) {
       LOG.debug("block already cached: {}", blockId);
       return true;
     }
