@@ -600,7 +600,6 @@ public class FileSystemMasterSyncMetadataMetricsTest {
 
     AlluxioURI path0 = new AlluxioURI("/dir0");
     UfsStatus stat0 = createUfsStatusWithName("dir0");
-
     AlluxioURI path1 = new AlluxioURI("/dir1");
 
     ufsStatusCache.addStatus(path0, stat0);
