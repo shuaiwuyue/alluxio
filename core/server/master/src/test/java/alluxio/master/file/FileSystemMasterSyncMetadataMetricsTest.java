@@ -393,17 +393,17 @@ public class FileSystemMasterSyncMetadataMetricsTest {
   public void metadataPrefetchMetrics() throws Exception {
     final Counter prefetchOpsCount =
         DefaultFileSystemMaster.Metrics.METADATA_SYNC_PREFETCH_OPS_COUNT;
-    final Counter succeededPrefetch =
+    final Counter succeededPrefetches =
         DefaultFileSystemMaster.Metrics.METADATA_SYNC_PREFETCH_SUCCESS;
-    final Counter failedPrefetch = DefaultFileSystemMaster.Metrics.METADATA_SYNC_PREFETCH_FAIL;
-    final Counter canceledPrefetch = DefaultFileSystemMaster.Metrics.METADATA_SYNC_PREFETCH_CANCEL;
+    final Counter failedPrefetches = DefaultFileSystemMaster.Metrics.METADATA_SYNC_PREFETCH_FAIL;
+    final Counter canceledPrefetches = DefaultFileSystemMaster.Metrics.METADATA_SYNC_PREFETCH_CANCEL;
     final Counter prefetchPaths = DefaultFileSystemMaster.Metrics.METADATA_SYNC_PREFETCH_PATHS;
     final Counter prefetchRetries = DefaultFileSystemMaster.Metrics.METADATA_SYNC_PREFETCH_RETRIES;
 
     int previousPrefetchOpsCount = 0;
-    int previousSucceededPrefetch = 0;
-    int previousFailedPrefetch = 0;
-    int previousCancelPrefetch = 0;
+    int previousSucceededPrefetches = 0;
+    int previousFailedPrefetches = 0;
+    int previousCancelPrefetches = 0;
     int previousPrefetchPaths = 0;
 
     UfsStatusCache ufsStatusCache = new UfsStatusCache(Executors
@@ -428,15 +428,15 @@ public class FileSystemMasterSyncMetadataMetricsTest {
     ufsStatusCache.fetchChildrenIfAbsent(null, new AlluxioURI("/"), mountTable, false);
     assertEquals(previousPrefetchOpsCount + 1, prefetchOpsCount.getCount());
     previousPrefetchOpsCount += 1;
-    assertEquals(previousSucceededPrefetch + 1, succeededPrefetch.getCount());
-    previousSucceededPrefetch += 1;
-    assertEquals(previousFailedPrefetch + 0, failedPrefetch.getCount());
-    previousFailedPrefetch += 0;
+    assertEquals(previousSucceededPrefetches + 1, succeededPrefetches.getCount());
+    previousSucceededPrefetches += 1;
+    assertEquals(previousFailedPrefetches + 0, failedPrefetches.getCount());
+    previousFailedPrefetches += 0;
     // "/dir0" , "/dir1"
     assertEquals(previousPrefetchPaths + 2, prefetchPaths.getCount());
     previousPrefetchPaths += 2;
-    assertEquals(previousCancelPrefetch + 0, canceledPrefetch.getCount());
-    previousCancelPrefetch += 0;
+    assertEquals(previousCancelPrefetches + 0, canceledPrefetches.getCount());
+    previousCancelPrefetches += 0;
     ufsStatusCache.remove(ROOT);
 
     //The path is non-existent in UFS
@@ -445,14 +445,14 @@ public class FileSystemMasterSyncMetadataMetricsTest {
     ufsStatusCache.fetchChildrenIfAbsent(null, new AlluxioURI(dir2), mountTable, false);
     assertEquals(previousPrefetchOpsCount + 1, prefetchOpsCount.getCount());
     previousPrefetchOpsCount += 1;
-    assertEquals(previousSucceededPrefetch + 1, succeededPrefetch.getCount());
-    previousSucceededPrefetch += 1;
-    assertEquals(previousFailedPrefetch + 0, failedPrefetch.getCount());
-    previousFailedPrefetch += 0;
+    assertEquals(previousSucceededPrefetches + 1, succeededPrefetches.getCount());
+    previousSucceededPrefetches += 1;
+    assertEquals(previousFailedPrefetches + 0, failedPrefetches.getCount());
+    previousFailedPrefetches += 0;
     assertEquals(previousPrefetchPaths + 0, prefetchPaths.getCount());
     previousPrefetchPaths += 0;
-    assertEquals(previousCancelPrefetch + 0, canceledPrefetch.getCount());
-    previousCancelPrefetch += 0;
+    assertEquals(previousCancelPrefetches + 0, canceledPrefetches.getCount());
+    previousCancelPrefetches += 0;
     ufsStatusCache.remove(new AlluxioURI(dir2));
 
     //The path is existent in UFS but UFS throws IOException
@@ -462,14 +462,14 @@ public class FileSystemMasterSyncMetadataMetricsTest {
     ufsStatusCache.fetchChildrenIfAbsent(null, ROOT, mountTable, false);
     assertEquals(previousPrefetchOpsCount + 1, prefetchOpsCount.getCount());
     previousPrefetchOpsCount += 1;
-    assertEquals(previousSucceededPrefetch + 1, succeededPrefetch.getCount());
-    previousSucceededPrefetch += 1;
-    assertEquals(previousFailedPrefetch + 0, failedPrefetch.getCount());
-    previousFailedPrefetch += 0;
+    assertEquals(previousSucceededPrefetches + 1, succeededPrefetches.getCount());
+    previousSucceededPrefetches += 1;
+    assertEquals(previousFailedPrefetches + 0, failedPrefetches.getCount());
+    previousFailedPrefetches += 0;
     assertEquals(previousPrefetchPaths + 0, prefetchPaths.getCount());
     previousPrefetchPaths += 0;
-    assertEquals(previousCancelPrefetch + 0, canceledPrefetch.getCount());
-    previousCancelPrefetch += 0;
+    assertEquals(previousCancelPrefetches + 0, canceledPrefetches.getCount());
+    previousCancelPrefetches += 0;
     ufsStatusCache.remove(ROOT);
 
     //The path is existent in UFS and UFS throws RuntimeException
@@ -479,14 +479,14 @@ public class FileSystemMasterSyncMetadataMetricsTest {
     ufsStatusCache.fetchChildrenIfAbsent(null, ROOT, mountTable, false);
     assertEquals(previousPrefetchOpsCount + 1, prefetchOpsCount.getCount());
     previousPrefetchOpsCount += 1;
-    assertEquals(previousSucceededPrefetch + 0, succeededPrefetch.getCount());
-    previousSucceededPrefetch += 0;
-    assertEquals(previousFailedPrefetch + 1, failedPrefetch.getCount());
-    previousFailedPrefetch += 1;
+    assertEquals(previousSucceededPrefetches + 0, succeededPrefetches.getCount());
+    previousSucceededPrefetches += 0;
+    assertEquals(previousFailedPrefetches + 1, failedPrefetches.getCount());
+    previousFailedPrefetches += 1;
     assertEquals(previousPrefetchPaths + 0, prefetchPaths.getCount());
     previousPrefetchPaths += 0;
-    assertEquals(previousCancelPrefetch + 0, canceledPrefetch.getCount());
-    previousCancelPrefetch += 0;
+    assertEquals(previousCancelPrefetches + 0, canceledPrefetches.getCount());
+    previousCancelPrefetches += 0;
     ufsStatusCache.remove(ROOT);
 
     //The prefetchRetries should increase because the UFS.listStatus() is delayed
@@ -497,15 +497,15 @@ public class FileSystemMasterSyncMetadataMetricsTest {
     ufsStatusCache.fetchChildrenIfAbsent(null, ROOT, mountTable, false);
     assertEquals(previousPrefetchOpsCount + 1, prefetchOpsCount.getCount());
     previousPrefetchOpsCount += 1;
-    assertEquals(previousSucceededPrefetch + 1, succeededPrefetch.getCount());
-    previousSucceededPrefetch += 1;
-    assertEquals(previousFailedPrefetch + 0, failedPrefetch.getCount());
-    previousFailedPrefetch += 0;
+    assertEquals(previousSucceededPrefetches + 1, succeededPrefetches.getCount());
+    previousSucceededPrefetches += 1;
+    assertEquals(previousFailedPrefetches + 0, failedPrefetches.getCount());
+    previousFailedPrefetches += 0;
     // "/dir0" , "/dir1"
     assertEquals(previousPrefetchPaths + 2, prefetchPaths.getCount());
     previousPrefetchPaths += 2;
-    assertEquals(previousCancelPrefetch + 0, canceledPrefetch.getCount());
-    previousCancelPrefetch += 0;
+    assertEquals(previousCancelPrefetches + 0, canceledPrefetches.getCount());
+    previousCancelPrefetches += 0;
     assertTrue(0 < prefetchRetries.getCount());
     ufsStatusCache.remove(ROOT);
 
@@ -515,15 +515,15 @@ public class FileSystemMasterSyncMetadataMetricsTest {
     ufsStatusCache.fetchChildrenIfAbsent(null, ROOT, mountTable, false);
     assertEquals(previousPrefetchOpsCount + 2, prefetchOpsCount.getCount());
     previousPrefetchOpsCount += 2;
-    assertEquals(previousSucceededPrefetch + 1, succeededPrefetch.getCount());
-    previousSucceededPrefetch += 1;
-    assertEquals(previousFailedPrefetch + 0, failedPrefetch.getCount());
-    previousFailedPrefetch += 0;
+    assertEquals(previousSucceededPrefetches + 1, succeededPrefetches.getCount());
+    previousSucceededPrefetches += 1;
+    assertEquals(previousFailedPrefetches + 0, failedPrefetches.getCount());
+    previousFailedPrefetches += 0;
     // "/dir0" , "/dir1"
     assertEquals(previousPrefetchPaths + 2, prefetchPaths.getCount());
     previousPrefetchPaths += 2;
-    assertEquals(previousCancelPrefetch + 1, canceledPrefetch.getCount());
-    previousCancelPrefetch += 1;
+    assertEquals(previousCancelPrefetches + 1, canceledPrefetches.getCount());
+    previousCancelPrefetches += 1;
     ufsStatusCache.remove(ROOT);
 
     mUfs.mIsDelay = false;
@@ -545,19 +545,19 @@ public class FileSystemMasterSyncMetadataMetricsTest {
     //getFromUfs: "/" , "/dir0" , "/dir0/file0" , "/dir0/file1" ,"/dir0/file2"
     //                  "/dir1" , "/dir1/file0" , "/dir1/file1" , "/dir1/file2"
     //prefetchChildren: "/" , "/dir0" , "/dir1"
-    assertEquals(previousSucceededPrefetch + 12, succeededPrefetch.getCount());
-    previousSucceededPrefetch += 12;
+    assertEquals(previousSucceededPrefetches + 12, succeededPrefetches.getCount());
+    previousSucceededPrefetches += 12;
     //getFromUfs: "/" , "/dir0" , "/dir0/file0" , "/dir0/file1" ,"/dir0/file2"
     //                  "/dir1" , "/dir1/file0" , "/dir1/file1" , "/dir1/file2"
     //prefetchChildren: "/dir0" , "/dir0/file0" , "/dir0/file1" ,"/dir0/file2"
     //                  "/dir1" , "/dir1/file0" , "/dir1/file1" , "/dir1/file2"
     assertEquals(previousPrefetchPaths + 17, prefetchPaths.getCount());
     previousPrefetchPaths += 17;
-    assertEquals(previousFailedPrefetch + 0, failedPrefetch.getCount());
-    previousFailedPrefetch += 0;
+    assertEquals(previousFailedPrefetches + 0, failedPrefetches.getCount());
+    previousFailedPrefetches += 0;
     // "/dir0" and "/dir1" in prefetchChildren are canceled because of double commits
-    assertEquals(previousCancelPrefetch + 2, canceledPrefetch.getCount());
-    previousCancelPrefetch += 2;
+    assertEquals(previousCancelPrefetches + 2, canceledPrefetches.getCount());
+    previousCancelPrefetches += 2;
 
     //Let UFS throw IOException
     mUfs.mIsThrowIOException = true;
@@ -571,22 +571,22 @@ public class FileSystemMasterSyncMetadataMetricsTest {
     //getFromUfs: "/" , "/dir0" , "/dir1"
     //prefetchChildren: "/" , "/dir0" , "/dir1"
     assertEquals(previousPrefetchOpsCount + 6, prefetchOpsCount.getCount());
-    previousPrefetchPaths += 6;
+    previousPrefetchOpsCount += 6;
     //getFromUfs: "/" , "/dir0" , "/dir1"
     //prefetchChildren: "/"
-    assertEquals(previousSucceededPrefetch + 3, succeededPrefetch.getCount());
-    previousSucceededPrefetch += 3;
+    assertEquals(previousSucceededPrefetches + 4, succeededPrefetches.getCount());
+    previousSucceededPrefetches += 4;
     //getFromUfs: "/" , "/dir0" , "/dir1"
     assertEquals(previousPrefetchPaths + 3, prefetchPaths.getCount());
     previousPrefetchPaths += 3;
-    assertEquals(previousFailedPrefetch + 0, failedPrefetch.getCount());
-    previousFailedPrefetch += 0;
+    assertEquals(previousFailedPrefetches + 0, failedPrefetches.getCount());
+    previousFailedPrefetches += 0;
     // "/dir0" and "/dir1" in prefetchChildren are canceled by cancelAllPrefetch
     // because the prefetches for "/dir0" and "/dir1" are submitted and then
     // "/dir0" and "/dir1" are removed from inodeTree when sync the root path.
     // So the prefetches are discarded
-    assertEquals(previousCancelPrefetch + 2, canceledPrefetch.getCount());
-    previousCancelPrefetch += 2;
+    assertEquals(previousCancelPrefetches + 2, canceledPrefetches.getCount());
+    previousCancelPrefetches += 2;
   }
 
   @Test
