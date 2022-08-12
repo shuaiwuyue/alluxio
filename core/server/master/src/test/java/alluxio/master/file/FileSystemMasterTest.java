@@ -26,7 +26,6 @@ import alluxio.AlluxioTestDirectory;
 import alluxio.AlluxioURI;
 import alluxio.AuthenticatedClientUserResource;
 import alluxio.AuthenticatedUserRule;
-import alluxio.ConfigurationRule;
 import alluxio.Constants;
 import alluxio.client.WriteType;
 import alluxio.conf.Configuration;
@@ -119,6 +118,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -130,6 +131,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -143,6 +145,7 @@ import java.util.stream.Collectors;
 /**
  * Unit tests for {@link FileSystemMaster}.
  */
+@RunWith(Parameterized.class)
 public final class FileSystemMasterTest {
   private static final Logger LOG = LoggerFactory.getLogger(FileSystemMasterTest.class);
 
@@ -191,21 +194,32 @@ public final class FileSystemMasterTest {
   public AuthenticatedUserRule mAuthenticatedUser = new AuthenticatedUserRule(TEST_USER,
       Configuration.global());
 
-  @Rule
-  public ConfigurationRule mConfigurationRule =
-      new ConfigurationRule(new HashMap<PropertyKey, Object>() {
-        {
-          put(PropertyKey.MASTER_JOURNAL_TYPE, JournalType.UFS);
-          put(PropertyKey.SECURITY_AUTHORIZATION_PERMISSION_UMASK, "000");
-          put(PropertyKey.MASTER_JOURNAL_TAILER_SLEEP_TIME_MS, 20);
-          put(PropertyKey.MASTER_JOURNAL_TAILER_SHUTDOWN_QUIET_WAIT_TIME_MS, 0);
-          put(PropertyKey.WORK_DIR,
-              AlluxioTestDirectory.createTemporaryDirectory("workdir").getAbsolutePath());
-          put(PropertyKey.MASTER_MOUNT_TABLE_ROOT_UFS, AlluxioTestDirectory
-              .createTemporaryDirectory("FileSystemMasterTest").getAbsolutePath());
-          put(PropertyKey.MASTER_FILE_SYSTEM_OPERATION_RETRY_CACHE_ENABLED, false);
-        }
-      }, Configuration.modifiableGlobal());
+  @Parameterized.Parameters
+  public static Collection<Object[]> data() {
+    HashMap<PropertyKey, Object> baseConfig = new HashMap<PropertyKey, Object>() {
+      {
+        put(PropertyKey.MASTER_JOURNAL_TYPE, JournalType.UFS);
+        put(PropertyKey.SECURITY_AUTHORIZATION_PERMISSION_UMASK, "000");
+        put(PropertyKey.MASTER_JOURNAL_TAILER_SLEEP_TIME_MS, 20);
+        put(PropertyKey.MASTER_JOURNAL_TAILER_SHUTDOWN_QUIET_WAIT_TIME_MS, 0);
+        put(PropertyKey.MASTER_FILE_SYSTEM_OPERATION_RETRY_CACHE_ENABLED, false);
+      }
+    };
+
+    return Arrays.asList(new Object[][] {
+        {new ImmutableMap.Builder<PropertyKey, Object>()
+            .putAll(baseConfig)
+            .put(PropertyKey.MASTER_FILE_SYSTEM_MERGE_INODE_JOURNALS, false)
+            .build()},
+        {new ImmutableMap.Builder<PropertyKey, Object>()
+            .putAll(baseConfig)
+            .put(PropertyKey.MASTER_FILE_SYSTEM_MERGE_INODE_JOURNALS, true)
+            .build()},
+    });
+  }
+
+  @Parameterized.Parameter
+  public ImmutableMap<PropertyKey, Object> mConfigMap;
 
   @ClassRule
   public static ManuallyScheduleHeartbeat sManuallySchedule = new ManuallyScheduleHeartbeat(
@@ -220,6 +234,15 @@ public final class FileSystemMasterTest {
    */
   @Before
   public void before() throws Exception {
+    Configuration.reloadProperties();
+    for (Map.Entry<PropertyKey, Object> entry : mConfigMap.entrySet()) {
+      Configuration.set(entry.getKey(), entry.getValue());
+    }
+    Configuration.set(PropertyKey.WORK_DIR,
+        AlluxioTestDirectory.createTemporaryDirectory("workdir").getAbsolutePath());
+    Configuration.set(PropertyKey.MASTER_MOUNT_TABLE_ROOT_UFS, AlluxioTestDirectory
+        .createTemporaryDirectory("FileSystemMasterTest").getAbsolutePath());
+
     GroupMappingServiceTestUtils.resetCache();
     MetricsSystem.clearAllMetrics();
     // This makes sure that the mount point of the UFS corresponding to the Alluxio root ("/")
@@ -413,6 +436,9 @@ public final class FileSystemMasterTest {
 
   @Test
   public void deleteDirRecursiveWithPermissions() throws Exception {
+    System.out.println("can can need");
+    System.out.println(mTestFolder.getRoot().toString());
+
     // userA has permissions to delete directory and nested file
     createFileWithSingleBlock(NESTED_FILE_URI);
     mFileSystemMaster.setAttribute(NESTED_URI, SetAttributeContext
@@ -2100,6 +2126,9 @@ public final class FileSystemMasterTest {
    */
   @Test
   public void setSmallerTtlForFileWithTtl() throws Exception {
+    System.out.println("can can need");
+    System.out.println(mTestFolder.getRoot().toString());
+
     CreateFileContext context = CreateFileContext.mergeFrom(CreateFilePOptions.newBuilder()
         .setCommonOptions(FileSystemMasterCommonPOptions.newBuilder().setTtl(Constants.HOUR_MS))
         .setBlockSizeBytes(Constants.KB).setRecursive(true));

@@ -51,7 +51,9 @@ import alluxio.master.file.meta.MutableInodeFile;
 import alluxio.master.file.meta.UfsAbsentPathCache;
 import alluxio.master.file.meta.UfsSyncPathCache;
 import alluxio.master.file.meta.UfsSyncUtils;
+import alluxio.master.journal.JournalContext;
 import alluxio.master.journal.MergeJournalContext;
+import alluxio.master.journal.NoopJournalContext;
 import alluxio.master.metastore.ReadOnlyInodeStore;
 import alluxio.proto.journal.File;
 import alluxio.proto.journal.Journal;
@@ -313,7 +315,8 @@ public class InodeSyncStream {
       return SyncStatus.NOT_NEEDED;
     }
     Instant startTime = Instant.now();
-    try (LockedInodePath path = mInodeTree.lockInodePath(mRootScheme)) {
+    try (LockedInodePath path =
+             mInodeTree.lockInodePath(mRootScheme, mRpcContext.getJournalContext())) {
       if (mAuditContext != null && mAuditContextSrcInodeFunc != null) {
         mAuditContext.setSrcInode(mAuditContextSrcInodeFunc.apply(path));
       }
@@ -504,7 +507,8 @@ public class InodeSyncStream {
     if (!scheme.shouldSync() && !mForceSync) {
       return false;
     }
-    try (LockedInodePath inodePath = mInodeTree.tryLockInodePath(scheme)) {
+    try (LockedInodePath inodePath =
+             mInodeTree.tryLockInodePath(scheme, mRpcContext.getJournalContext())) {
       if (Thread.currentThread().isInterrupted()) {
         LOG.warn("Thread syncing {} was interrupted before completion", inodePath.getUri());
         return false;
@@ -987,13 +991,22 @@ public class InodeSyncStream {
       createFileContext.setOperationTimeMs(ufsLastModified);
     }
 
+    boolean useInodeSyncMergeJournalContext
+        = !Configuration.getBoolean(
+            PropertyKey.MASTER_FILE_SYSTEM_MERGE_INODE_JOURNALS
+    );
     try (LockedInodePath writeLockedPath = inodePath.lockFinalEdgeWrite();
-         MergeJournalContext merger = new MergeJournalContext(rpcContext.getJournalContext(),
+         JournalContext merger = useInodeSyncMergeJournalContext
+             ? new MergeJournalContext(rpcContext.getJournalContext(),
              writeLockedPath.getUri(),
-             InodeSyncStream::mergeCreateComplete)) {
+             InodeSyncStream::mergeCreateComplete)
+             : NoopJournalContext.INSTANCE;
+    ) {
       // We do not want to close this wrapRpcContext because it uses elements from another context
-      RpcContext wrapRpcContext = new RpcContext(
-          rpcContext.getBlockDeletionContext(), merger, rpcContext.getOperationContext());
+      RpcContext wrapRpcContext = useInodeSyncMergeJournalContext
+          ? new RpcContext(
+              rpcContext.getBlockDeletionContext(), merger, rpcContext.getOperationContext())
+          : rpcContext;
       fsMaster.createFileInternal(wrapRpcContext, writeLockedPath, createFileContext);
       CompleteFileContext completeContext =
           CompleteFileContext.mergeFrom(CompleteFilePOptions.newBuilder().setUfsLength(ufsLength))

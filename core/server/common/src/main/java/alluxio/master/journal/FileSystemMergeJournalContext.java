@@ -11,7 +11,6 @@
 
 package alluxio.master.journal;
 
-import alluxio.AlluxioURI;
 import alluxio.exception.status.UnavailableException;
 import alluxio.proto.journal.Journal.JournalEntry;
 
@@ -28,73 +27,66 @@ import javax.annotation.concurrent.NotThreadSafe;
  * Context for merging journal entries together for a wrapped journal context.
  *
  * This is used so that we can combine several journal entries into one using a merge
- * function. This prevents partial writes of these journal entries causing system to
- * be left in an inconsistent state. For example, createFile without completing the file.
- *
- * This class will only merge the relevant inode entries for a particular URL.
- * File operations to other URIs will be passed to the underlying JournalContext,
- * and will not be buffered.
- *
- * Note that any buffered journal entries are not persisted and they will only be persisted
- * when close is called on them. Closing the MergeJournalContext will also not close
- * the enclosed journal context.
+ * function. This helps us resolve the inconsistency between primary and standby and
+ * decrease the chance for a standby to see intermediate state of a file system operation.
  */
 @NotThreadSafe
-public final class MergeJournalContext implements JournalContext {
+public final class FileSystemMergeJournalContext implements JournalContext {
   // It will log a warning if the number of buffered journal entries exceed 100
   public static final int MAX_ENTRIES = 100;
-  private static final long INVALID_FILE_ID = -1;
 
   private static final Logger LOG = LoggerFactory.getLogger(MergeJournalContext.class);
 
   private final JournalContext mJournalContext;
-  private final AlluxioURI mUri;
   private final UnaryOperator<List<JournalEntry>> mMergeOperator;
   private final List<JournalEntry> mJournalEntries = new ArrayList<>();
-  private long mFileId = INVALID_FILE_ID;
 
   /**
-   * Constructs a {@link MergeJournalContext}.
+   * Constructs a {@link FileSystemMergeJournalContext}.
    * @param journalContext the journal context to wrap
-   * @param uri Alluxio URI that needs merging
-   * @param merger merging function which will merge multiple journal entries into one
+   * @param mergeOperator merging function which will merge multiple journal entries into one
    */
-  public MergeJournalContext(JournalContext journalContext,
-      AlluxioURI uri, UnaryOperator<List<JournalEntry>> merger) {
+  public FileSystemMergeJournalContext(JournalContext journalContext,
+                             UnaryOperator<List<JournalEntry>> mergeOperator) {
     Preconditions.checkNotNull(journalContext, "journalContext");
     mJournalContext = journalContext;
-    mMergeOperator = merger;
-    mUri = uri;
+    mMergeOperator = mergeOperator;
   }
 
+  /**
+   * Captures all journals so that we can merge them later.
+   * @param entry the {@link JournalEntry} to append to the journal
+   */
   @Override
   public void append(JournalEntry entry) {
-    boolean merge = false;
-    // We are merging these statements because they have the potential to leave incomplete files.
-    // We can add additional statement to be merged if necessary.
-    if (entry.hasInodeFile() || entry.hasUpdateInode() || entry.hasUpdateInodeFile()) {
-      if (entry.hasInodeFile() && entry.getInodeFile().getPath().equals(mUri.getPath())) {
-        merge = true;
-        mFileId = entry.getInodeFile().getId();
-      } else if (entry.hasUpdateInodeFile() && mFileId != INVALID_FILE_ID
-          && entry.getUpdateInodeFile().getId() == mFileId) {
-        merge = true;
-      } else if (entry.hasUpdateInode() && mFileId != INVALID_FILE_ID
-          && entry.getUpdateInode().getId() == mFileId) {
-        merge = true;
-      }
-    }
-    if (merge) {
-      // to be merged
-      mJournalEntries.add(entry);
-    } else {
-      // pass through
-      mJournalContext.append(entry);
-    }
+    mJournalEntries.add(entry);
   }
 
   @Override
+  public void close() throws UnavailableException {
+    try {
+      mergeAndAppendJournals();
+    } finally {
+      mJournalContext.close();
+    }
+  }
+
+  /**
+   * Merges all journals and then flushes them.
+   * The journal writer will commit these journals synchronously.
+   */
+  @Override
   public void flush() throws UnavailableException {
+    // Skip flushing the journal if no journal entries to append
+    if (mergeAndAppendJournals()) {
+      mJournalContext.flush();
+    }
+  }
+
+  private boolean mergeAndAppendJournals() {
+    if (mJournalEntries.isEmpty()) {
+      return false;
+    }
     if (mJournalEntries.size() > MAX_ENTRIES) {
       LOG.debug("MergeJournalContext has " + mJournalEntries.size()
           + " entries, over the limit of " + MAX_ENTRIES);
@@ -102,10 +94,6 @@ public final class MergeJournalContext implements JournalContext {
     List<JournalEntry> mergedEntries = mMergeOperator.apply(mJournalEntries);
     mergedEntries.forEach(mJournalContext::append);
     mJournalEntries.clear();
-  }
-
-  @Override
-  public void close() throws UnavailableException {
-    flush();
+    return true;
   }
 }
