@@ -436,9 +436,6 @@ public final class FileSystemMasterTest {
 
   @Test
   public void deleteDirRecursiveWithPermissions() throws Exception {
-    System.out.println("can can need");
-    System.out.println(mTestFolder.getRoot().toString());
-
     // userA has permissions to delete directory and nested file
     createFileWithSingleBlock(NESTED_FILE_URI);
     mFileSystemMaster.setAttribute(NESTED_URI, SetAttributeContext
@@ -2126,9 +2123,6 @@ public final class FileSystemMasterTest {
    */
   @Test
   public void setSmallerTtlForFileWithTtl() throws Exception {
-    System.out.println("can can need");
-    System.out.println(mTestFolder.getRoot().toString());
-
     CreateFileContext context = CreateFileContext.mergeFrom(CreateFilePOptions.newBuilder()
         .setCommonOptions(FileSystemMasterCommonPOptions.newBuilder().setTtl(Constants.HOUR_MS))
         .setBlockSizeBytes(Constants.KB).setRecursive(true));

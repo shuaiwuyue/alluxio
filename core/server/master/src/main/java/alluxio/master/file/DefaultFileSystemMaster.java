@@ -2105,9 +2105,7 @@ public class DefaultFileSystemMaster extends CoreMaster
       // This walks the tree in a DFS flavor, first all the children in a subtree,
       // then the sibling trees one by one.
       // Therefore, we first see a parent, then all its children.
-
       for (LockedInodePath childPath : descendants) {
-        System.out.println(childPath.getInode().getName());
         if (bypassPermCheck) {
           inodesToDelete.add(new Pair<>(mInodeTree.getPath(childPath.getInode()), childPath));
         } else {
